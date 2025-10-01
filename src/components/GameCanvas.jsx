@@ -99,7 +99,9 @@ export default function GameCanvas({ onScore, onGameOver, disabled }) {
         if (z < 3) type = ROW_TYPES.GRASS; // start safe
         else type = Math.random() < 0.55 ? ROW_TYPES.ROAD : ROW_TYPES.GRASS;
 
-        rows.push({ type, z, cars: [], dir: Math.random() < 0.5 ? -1 : 1, speed: rand(1.2, 2.4) });
+        // Slower car speeds (units per second)
+        const laneSpeed = rand(1.2, 2.0);
+        rows.push({ type, z, cars: [], dir: Math.random() < 0.5 ? -1 : 1, speed: laneSpeed });
 
         for (let x = 0; x < WORLD.cols; x++) {
           const mat = type === ROW_TYPES.ROAD ? matRoad : matGrass;
@@ -161,13 +163,10 @@ export default function GameCanvas({ onScore, onGameOver, disabled }) {
       }
 
       // Input
-      const keys = new Set();
       const onKeyDown = (e) => {
         if (!playerState.alive) return;
-        keys.add(e.key);
         stepFromKeys(e.key);
       };
-      const onKeyUp = (e) => keys.delete(e.key);
 
       function stepFromKeys(key) {
         if (disabled) return;
@@ -210,7 +209,6 @@ export default function GameCanvas({ onScore, onGameOver, disabled }) {
       }
 
       window.addEventListener('keydown', onKeyDown);
-      window.addEventListener('keyup', onKeyUp);
 
       // Resize
       function onResize() {
@@ -224,6 +222,7 @@ export default function GameCanvas({ onScore, onGameOver, disabled }) {
 
       // Game loop
       const boundsX = { min: -6, max: WORLD.cols + 6 };
+      let lastTs = performance.now();
 
       function checkCollision() {
         const row = rows[playerState.z];
@@ -244,12 +243,16 @@ export default function GameCanvas({ onScore, onGameOver, disabled }) {
       }
 
       function animate(ts) {
-        // Move cars
+        const dt = Math.min(0.05, Math.max(0, (ts - lastTs) / 1000)); // clamp to avoid big jumps
+        lastTs = ts;
+
+        // Move cars with proper delta time and slower speeds
         for (const row of rows) {
           if (row.type !== ROW_TYPES.ROAD) continue;
-          const speed = row.speed * 0.016 * (row.dir < 0 ? -1 : 1);
+          const dirSign = row.dir < 0 ? -1 : 1;
+          const vx = (disabled ? 0 : row.speed) * dirSign; // units per second
           for (const c of row.cars) {
-            c.mesh.position.x += speed * 60 * (disabled ? 0 : 1);
+            c.mesh.position.x += vx * dt;
             if (c.mesh.position.x < boundsX.min) c.mesh.position.x = boundsX.max;
             if (c.mesh.position.x > boundsX.max) c.mesh.position.x = boundsX.min;
           }
@@ -268,7 +271,7 @@ export default function GameCanvas({ onScore, onGameOver, disabled }) {
       threeRef.current = { THREE, renderer, scene, camera };
 
       return () => {
-        // cleanup
+        // cleanup handled below
       };
     }
 
@@ -276,13 +279,12 @@ export default function GameCanvas({ onScore, onGameOver, disabled }) {
 
     return () => {
       disposed = true;
+      cancelAnimationFrame(animationId);
       try {
         window.removeEventListener('resize', () => {});
       } catch {}
       window.removeEventListener('keydown', () => {});
-      window.removeEventListener('keyup', () => {});
       if (threeRef.current && threeRef.current.renderer) {
-        cancelAnimationFrame(animationId);
         threeRef.current.renderer.dispose();
       }
       if (containerRef.current) containerRef.current.innerHTML = '';
