@@ -1,28 +1,41 @@
-import { useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react';
+import GameCanvas from './components/GameCanvas.jsx';
+import HUD from './components/HUD.jsx';
+import Controls from './components/Controls.jsx';
+import TitleBar from './components/TitleBar.jsx';
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [score, setScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+  const restartKey = useRef(0);
+
+  const handleScore = useCallback((s) => {
+    setScore((prev) => (s > prev ? s : prev));
+  }, []);
+
+  const handleGameOver = useCallback(() => {
+    setGameOver(true);
+  }, []);
+
+  const handleRestart = useCallback(() => {
+    setScore(0);
+    setGameOver(false);
+    restartKey.current += 1;
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">
-          Vibe Coding Platform
-        </h1>
-        <p className="text-gray-600 mb-6">
-          Your AI-powered development environment
-        </p>
-        <div className="text-center">
-          <button
-            onClick={() => setCount(count + 1)}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded"
-          >
-            Count is {count}
-          </button>
-        </div>
+    <div className="w-full h-screen bg-gradient-to-b from-slate-900 to-slate-800 text-white overflow-hidden">
+      <TitleBar />
+      <div className="relative w-full h-[calc(100vh-56px)]">
+        <GameCanvas
+          key={`game-${restartKey.current}`}
+          onScore={handleScore}
+          onGameOver={handleGameOver}
+          disabled={gameOver}
+        />
+        <HUD score={score} gameOver={gameOver} onRestart={handleRestart} />
+        {!gameOver && <Controls />}
       </div>
     </div>
-  )
+  );
 }
-
-export default App
